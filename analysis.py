@@ -1,18 +1,54 @@
 import pandas as pd
+import os, time
 
-#open csv file, convert to dataframe and change datetime format
-def opendf(path):
-    df = pd.read_csv(path)
+#process text data and return list of hashtags
+def hstg(str):
+    raw_text = str[str.find('#'):]
+    text = raw_text.split()
+    for t in text:
+        if not t.startswith('#'):
+            text.remove(t)
+        else:
+            cnt = t.count('#')
+            if cnt == 0:
+                text.remove(t)
+            if cnt == 1:
+                pass
+            else:
+                t2 = t.lstrip('#')
+                t2 = t2.split('#')
+                for tt in t2:
+                    text.append('#' + tt)
+    return text
+
+
+#merge csv files and filter data
+def merge(path):
+    os.chdir(path)
+    df = pd.DataFrame(columns=['datetime', 'shortcode', 'user id', 'likes', 'text'])
+    for f in os.listdir(path):
+        num = 88
+        csv = pd.read_csv(f)
+        for row in csv.iterrows():
+            raw_text = row['text']
+            if row['shortcode'] in df.loc[:, 'shortcode'].values:
+                pass
+            else:
+                row['text'] = hstg(raw_text)
+                df = df.append(row, ignore_index=True)
+        num -= 1
+        print(f'Finished {os.path.basename(f)}, {num} files remaining')
     df['datetime'] = pd.to_datetime(df['datetime'], unit='D')
     df.sort_values(by='datetime')
-    return df
-
-#create second dataframe with posts dated 2018-2019
-def df_1819(df):
     df = df.set_index(['datetime'])
-    df = df.loc['2018-01-01':'2019-12-31']
-    export_csv = df.to_csv(r'C:\Users\Sean\Documents\Intern\dataframetest18-19.txt', header=True)
-    return df
+    df2 = df.loc['2018-01-01':'2019-12-31']
+    return df, df2
+
+
+#export to csv
+def export(df, path):
+    df.to_csv(path, header=True)
+
 
 #create dataframe of unique hashtags by user
 def hstg_byuser(df):
@@ -33,6 +69,7 @@ def hstg_byuser(df):
     resultdf = pd.DataFrame.from_dict(dict, orient='index', columns=['hashtags'])
     return resultdf
 
+
 #unique posts by day
 def posts_byday(df):
     dict = {}
@@ -43,6 +80,7 @@ def posts_byday(df):
             dict[i] = 1
     postcnt = pd.DataFrame.from_dict(dict, orient='index', columns=['posts'])
     return postcnt
+
 
 #create dictionary of hashtag counts
 def hstg_count(df):
@@ -56,7 +94,9 @@ def hstg_count(df):
     cnt = pd.DataFrame.from_dict(dict, orient='index', columns=['count'])
     return cnt
 
+
 def main():
+    merge(r'C:\Users\Sean\Documents\Intern\txt')
     df = opendf('C:\Users\Sean\Documents\Intern\dataframetest.txt')
     df1819 = df_1819(df)
 
@@ -74,7 +114,10 @@ def main():
     h_byuser = hstg_byuser(df)
     export_csv = h_byuser.to_csv(r'C:\Users\Sean\Documents\Intern\h_byuser.txt', header=True)
 
+
+init_time = time.time()
 main()
+print("done in: ", time.time() - init_time)
 
 
 
