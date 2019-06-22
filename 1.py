@@ -1,89 +1,86 @@
-
+import os, time, threading, queue
 import pandas as pd
-import os, csv, json
 
-#get list of directories to work with
-def get_pathlist(dir):
-    os.chdir(dir)
-    pathlist = []
 
-    for f in os.listdir(dir):
-        pathlist.append(os.path.abspath(f))
-
-    pathlist = list(dict.fromkeys(pathlist))
-    return pathlist
-
-#get list of files to work with
-def get_fileslist(dir):
-    os.chdir(dir)
-    fileslist = []
-
-    for f in os.listdir():
-        if f.endswith('.json'):
-            fileslist.append(f)
+def hstg(str):
+    raw_text = str[str.find('#'):]
+    text = raw_text.split()
+    for t in text:
+        if not t.startswith('#'):
+            text.remove(t)
         else:
-            pass
-
-    fileslist = list(dict.fromkeys(fileslist))
-    return fileslist
-
-#get a list of hashtags, shortcode, owner id, date time and number of likes
-def select_data(file):
-    data = json.load(file)
-    for x in data['node']['edge_media_to_caption']['edges']:
-        text = x['node']['text']
-        hstg = text.find('#')
-        text = text[hstg:]
-        global hstglist
-        hstglist = text.split()
-        for y in hstglist:
-            if y.startswith('#'):
+            cnt = t.count('#')
+            if cnt == 0:
+                text.remove(t)
+            if cnt == 1:
                 pass
             else:
-                hstglist.remove(y)
+                t2 = t.lstrip('#')
+                t2 = t2.split('#')
+                for tt in t2:
+                    text.append('#' + tt)
+    return text
 
 
-    timestamp = data['node']['taken_at_timestamp']
-    like = data['node']['edge_liked_by']['count']
-    scode = data['node']['shortcode']
-    id = data['node']['owner']['id']
-    return hstglist, timestamp, scode, id, like
+def process(q, rows):
+    name = q.get()
+    f = pd.read_csv(name)
+    for i, row in f.iterrows():
+        raw_text = str(row['text'])
+        row['text'] = hstg(raw_text)
+        row['timestamp'] = pd.to_datetime(row['timestamp'], unit='D')
+        rows.put(row)
+    q.taskdone()
 
-#create dictionary of hashtag counts
-def hstg_count(hstgs, empty_count):
-    for h in hstgs:
-        if h in empty_count:
-            empty_count[h] += 1
-        else:
-            empty_count[h] = 1
-    return empty_count
 
-#append data to main DataFrame
-def main_df(row, df):
-    if row['shortcode'] in df.loc[:, 'shortcode'].values:
-        pass
-    else:
-        df = df.append(row, ignore_index=True)
-    return df
+def append(rows):
+    df = pd.DataFrame(columns=['timestamp', 'shortcode', 'user id', 'likes', 'text'])
+    scode = []
+    while True:
+        try:
+            row = rows.get()
+            if not row['shortcode'] in scode:
+                scode.append(row['shortcode'])
+                df = df.append(row, ignore_index=True)
+                rows.taskdone()
+
+        except rows.empty:
+            if stopFlag == 1:
+                df.sort_values(by='datetime')
+                df = df.set_index(['datetime'])
+                df2 = df.loc['2018-01-01':'2019-12-31']
+                df.to_csv(path, header=True)
+                df.to_csv(path, header=True)
+                break
+
+
 
 def main():
-    count = {}
-    df = pd.DataFrame(columns=['datetime', 'shortcode', 'user id', 'likes', 'hashtags'])
-    pl = get_pathlist('/Users/Sean/Documents/Intern/Instagram-Json')
-    for p in range(len(pl)):
-        fileslist = get_fileslist(pl[p])
-        for i in range(len(fileslist)):
-            with open(fileslist[i]) as file:
-                hstgs, dt, scode, id, like = select_data(file)
-                row = {'datetime': dt, 'shortcode': scode, 'user id': id, 'likes':like, 'hashtags': hstgs}
-                count = hstg_count(hstgs, count)
-                df = main_df(row, df)
-        print('finished processing folder ', pl[p])
-    cnt = pd.DataFrame.from_dict(count, orient='index', columns=['count'])
-    export_csv = df.to_csv(r'C:\Users\Sean\Documents\Intern\dataframe.txt', header=True)
-    export_csv = cnt.to_csv(r'C:\Users\Sean\Documents\Intern\hstgcount.txt', header=True)
+    pth = '/Users/Sean/Documents/Intern/txt'
+    files = queue.Queue()
+    global stopFlag
+    stopFlag = 0
 
+    for f in os.listdir(pth):
+        files.put(os.path.join(pth, f))
+    rows = queue.Queue()
+
+    for x in range(9):
+        t = threading.Thread(target=process, args=(files, rows), daemon=True)
+        t.start()
+        time.sleep(.3)
+
+    apt = threading.Thread(target=append, args=(rows, ))
+    apt.start()
+
+    files.join()
+    rows.join()
+
+    if files.empty and rows.empty:
+        stopFlag = 1
+
+
+init_time = time.time()
 main()
-
-
+print(f'done in {(time.time()-init_time)/60}min')
 
