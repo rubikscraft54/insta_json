@@ -1,11 +1,13 @@
 import os, time, threading, queue
 import pandas as pd
+from datetime import datetime
 
 
 def hstg(str):
     raw_text = str[str.find('#'):]
     text = raw_text.split()
     for t in text:
+        t = t.strip('\n')
         if not t.startswith('#'):
             text.remove(t)
         else:
@@ -19,47 +21,58 @@ def hstg(str):
                 t2 = t2.split('#')
                 for tt in t2:
                     text.append('#' + tt)
-    return text
+    yield text
+
+
+def hstg2(t):
+    for w in t:
+        word = str(w)
+        if word[0] != '#':
+            t.remove(w)
+            continue
+        if word == '.':
+            t.remove(w)
+            continue
+    yield t
 
 
 def process(q, rows):
-    name = q.get()
-    f = pd.read_csv(name)
-    for i, row in f.iterrows():
-        raw_text = str(row['text'])
-        row['text'] = hstg(raw_text)
-        row['timestamp'] = pd.to_datetime(row['timestamp'], unit='D')
-        rows.put(row)
-    q.taskdone()
+    while True:
+        try:
+            name = q.get()
+            print(threading.currentThread().getName(), 'processing', os.path.basename(name), 'remaining: ', q.qsize())
+            f = pd.read_csv(name)
+            for i, row in f.iterrows():
+                raw_text = str(row['text'])
+                dt = datetime.fromtimestamp((row['timestamp']))
+                dt = dt.strftime('%x')
+                text = hstg2(hstg(raw_text))
+                line = {'datetime': dt, 'short code': row['shortcode'], 'user id': row['user id'],
+                        'likes': row['likes'], 'hashtags': text}
+                rows.put(line)
+            q.task_done()
+        except queue.Empty:
+            pass
 
 
 def append(rows):
-    df = pd.DataFrame(columns=['timestamp', 'shortcode', 'user id', 'likes', 'text'])
-    scode = []
+    global df
+    df = pd.DataFrame(columns=['datetime', 'short code', 'user id', 'likes', 'hashtags'])
     while True:
         try:
             row = rows.get()
-            if not row['shortcode'] in scode:
-                scode.append(row['shortcode'])
-                df = df.append(row, ignore_index=True)
-                rows.taskdone()
-
-        except rows.empty:
-            if stopFlag == 1:
-                df.sort_values(by='datetime')
-                df = df.set_index(['datetime'])
-                df2 = df.loc['2018-01-01':'2019-12-31']
-                df.to_csv(path, header=True)
-                df.to_csv(path, header=True)
-                break
-
+            if row['short code'] in df.loc[:, 'short code'].values:
+                rows.task_done()
+                continue
+            df = df.append(row, ignore_index=True)
+            rows.task_done()
+        except queue.Empty:
+            pass
 
 
 def main():
     pth = '/Users/Sean/Documents/Intern/txt'
     files = queue.Queue()
-    global stopFlag
-    stopFlag = 0
 
     for f in os.listdir(pth):
         files.put(os.path.join(pth, f))
@@ -68,19 +81,17 @@ def main():
     for x in range(9):
         t = threading.Thread(target=process, args=(files, rows), daemon=True)
         t.start()
-        time.sleep(.3)
+        time.sleep(.2)
 
-    apt = threading.Thread(target=append, args=(rows, ))
+    apt = threading.Thread(target=append, args=(rows, ), daemon=True)
     apt.start()
+    timed_msg(rows)
 
     files.join()
     rows.join()
 
-    if files.empty and rows.empty:
-        stopFlag = 1
-
 
 init_time = time.time()
 main()
-print(f'done in {(time.time()-init_time)/60}min')
-
+df.to_csv('/Users/Sean/Documents/Intern/analysis/dummy_test/result1.csv', header=True)
+print(f'done in {round((time.time()-init_time)/60)}min')
