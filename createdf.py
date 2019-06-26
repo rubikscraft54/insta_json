@@ -53,20 +53,17 @@ def worker(q):
 
 
 def main():
-    plx = get_pathlist('/Users/Sean/Documents/Intern/Instagram-Json')
-    pl = ['C:/Users/Sean/Documents/Intern/Instagram-Json/#selfharmmm',
-          'C:/Users/Sean/Documents/Intern/Instagram-Json/#selfharm',
-          'C:/Users/Sean/Documents/Intern/Instagram-Json/#cutting']
+    pl = get_pathlist('/Users/Sean/Documents/Intern/Instagram-Json')
     q = queue.Queue()
     for i in pl:
         q.put(i)
 
     threadList = []
-    for x in range(4):
+    for x in range(10):
         t = threading.Thread(target=worker, args=(q,), daemon=True)
         threadList.append(t)
         t.start()
-        time.sleep(1)
+        time.sleep(0.1)
 
     q.join()
 
