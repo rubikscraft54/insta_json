@@ -38,7 +38,7 @@ def fltr(tin):
             text.append(t)
         else:
             continue
-    t = ', '.join(text)
+    t = ','.join(text)
     t.replace("'", "''")
     return t
 
