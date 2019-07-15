@@ -40,5 +40,10 @@ def get_data(id):
             print('error!')
     finally:
         print('fn')
+    text = json.loads(soup.text)
+    username = text['user']['username']
+    private = text['user']['is_private']
+    verified = text['user']['is_verified']
 
-get_data('10001338635')
+
+get_data('10001485442')
