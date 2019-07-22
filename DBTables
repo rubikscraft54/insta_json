@@ -1,0 +1,25 @@
+USE NSSI_USERS;
+CREATE TABLE `users` (
+  `num_id` varchar(32) NOT NULL,
+  `username` varchar(32) DEFAULT NULL,
+  `private` enum('Y','N') DEFAULT NULL,
+  `verified` enum('Y','N') DEFAULT NULL,
+  `media_count` int(11) DEFAULT NULL,
+  `followers` int(11) DEFAULT NULL,
+  `following` int(11) DEFAULT NULL,
+  `biography` text,
+  `igtv_videos` int(11) DEFAULT NULL,
+  `total_ar_effects` int(11) DEFAULT NULL,
+  `usertags` int(11) DEFAULT NULL,
+  `interest_account` enum('Y','N') DEFAULT NULL,
+  `highlight_reels` enum('Y','N') DEFAULT NULL,
+  `can_be_reported` enum('Y','N') DEFAULT NULL,
+  `potential_business` enum('Y','N') DEFAULT NULL,
+  `auto_expand_chaining` enum('Y','N') DEFAULT NULL,
+  `highlight_reshare_disabled` enum('Y','N') DEFAULT NULL,
+  `ftags` int(11) DEFAULT NULL,
+  PRIMARY KEY (`num_id`)
+);
+CREATE TABLE `inactive` (
+  `NUM_ID` varchar(20) DEFAULT NULL
+);
